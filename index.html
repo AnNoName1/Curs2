@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manufactorum Database Interface</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #loginContainer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        #loginForm {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        input,
+        button {
+            margin-bottom: 10px;
+            display: block;
+            padding: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #4caf50;
+            color: #fff;
+            cursor: pointer;
+        }
+
+            button:hover {
+                background-color: #45a049;
+            }
+    </style>
+</head>
+
+<body>
+    <div id="loginContainer">
+        <div id="loginForm">
+            <h2>Login</h2>
+            <label for="username">Username:</label>
+            <input type="text" id="username">
+            <label for="password">Password:</label>
+            <input type="password" id="password">
+            <button onclick="login()">Login</button>
+        </div>
+    </div>
+
+    <h1 id="mainTitle" style="display: none;">Manufactorum Database Interface</h1>
+
+    <!-- Procedure Execution -->
+    <label for="procedureSelect" style="display: none;">Select Procedure:</label>
+    <select id="procedureSelect" style="display: none;">
+        <option value="" disabled selected>Select a procedure</option>
+        <!-- Populate this dropdown with available procedures dynamically -->
+    </select>
+    <br>
+    <label for="procedureInput" style="display: none;">Enter Parameters (comma-separated):</label>
+    <input type="text" id="procedureInput" style="display: none;">
+    <button id="executeProcedure" onclick="executeProcedure()" style="display: none;">Execute Procedure</button> <!-- Add the button with ID executeProcedure here -->
+    <br><br>
+
+    <!-- Function Execution -->
+    <label for="functionSelect" style="display: none;">Select Function:</label>
+    <select id="functionSelect" style="display: none;">
+        <option value="" disabled selected>Select a function</option>
+        <!-- Populate this dropdown with available functions dynamically -->
+    </select>
+    <br>
+    <label for="functionInput" style="display: none;">Enter Parameters (comma-separated):</label>
+    <input type="text" id="functionInput" style="display: none;">
+    <button id="executeFunction" onclick="executeFunctionWithParams()" style="display: none;">Execute Function</button> <!-- Add the button with ID executeFunction here -->
+    <br><br>
+
+    <!-- Select Statement Execution -->
+    <label for="selectStatement" style="display: none;">Enter SELECT Statement:</label>
+    <input type="text" id="selectStatement" style="display: none;">
+    <button id="executeSelect" onclick="executeSelect()" style="display: none;">Execute SELECT</button> <!-- Add the button with ID executeSelect here -->
+    <br><br>
+
+    <!-- Display Result -->
+    <h2 style="display: none;">Result:</h2>
+    <div id="resultContainer" style="display: none;"></div>
+
+    <script>
+
+        // Add login function to send credentials to the server for verification
+        function login() {
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+
+            console.log('Sending login request:', { username, password });
+
+            fetch('http://localhost:8080', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'login',
+                    username: username,
+                    password: password,
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Login response:', data);
+
+                    if (data.result && data.result.result && data.result.result.role) {
+                        // Save the user role (admin or user) in local storage
+                        localStorage.setItem('userRole', data.result.result.role);
+                        // Hide the login form and show the main content
+                        showMainContent();
+                    } else {
+                        alert('Invalid username or password');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error during login:', error);
+                });
+        }
+
+
+        // Show the main content based on the user's role
+        function showMainContent() {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('mainTitle').style.display = 'block';
+
+            // Show all elements (procedures, functions, etc.) for both admin and user
+            document.getElementById('procedureSelect').style.display = 'block';
+            document.getElementById('procedureInput').style.display = 'block';
+            document.getElementById('executeProcedure').style.display = 'block'; // Show the execute procedure button
+            document.getElementById('functionSelect').style.display = 'block';
+            document.getElementById('functionInput').style.display = 'block';
+            document.getElementById('executeFunction').style.display = 'block'; // Show the execute function button
+            document.getElementById('selectStatement').style.display = 'block'; // Show the select statement input
+            document.getElementById('executeSelect').style.display = 'block'; // Show the execute select button
+            document.getElementById('resultContainer').style.display = 'block'; // Show the result container
+
+            // Fetch and populate procedure and function names based on user role
+            fetchProcedureNames()
+            fetchFunctionNames()
+        }
+
+        function fetchProcedureNames() {
+            fetch('http://localhost:8080', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'getProcedureNames',
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching procedure names:', data.error);
+                    } else {
+                        if (Array.isArray(data.result.procedureNames)) {
+                            populateProcedureDropdown(data.result.procedureNames);
+                        } else {
+                            console.error('Procedure names are not an array:', data);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching procedure names:', error);
+                });
+        }
+
+        function fetchFunctionNames() {
+            fetch('http://localhost:8080', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'getFunctionNames',
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error fetching function names:', data.error);
+                    } else {
+                        if (Array.isArray(data.result.functionNames)) {
+                            populateFunctionDropdown(data.result.functionNames);
+                        } else {
+                            console.error('Function names are not an array:', data);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching function names:', error);
+                });
+        }
+
+
+        function populateProcedureDropdown(procedureNames) {
+            const procedureSelect = document.getElementById('procedureSelect');
+            procedureSelect.innerHTML = '<option value="" disabled selected>Select a procedure</option>';
+
+            const userRole = localStorage.getItem('userRole');
+
+            if (userRole === 'admin') {
+                // Show all procedures for the admin
+                procedureNames.forEach(procedureName => {
+                    const option = document.createElement('option');
+                    option.value = procedureName;
+                    option.textContent = procedureName;
+                    procedureSelect.appendChild(option);
+                });
+            } else if (userRole === 'user') {
+                // Show only "Get" procedures for the user
+                const getProcedures = procedureNames.filter(procedureName => procedureName.startsWith('Get'));
+                getProcedures.forEach(procedureName => {
+                    const option = document.createElement('option');
+                    option.value = procedureName;
+                    option.textContent = procedureName;
+                    procedureSelect.appendChild(option);
+                });
+            }
+        }
+        function populateFunctionDropdown(functionNames) {
+            const functionSelect = document.getElementById('functionSelect');
+            functionSelect.innerHTML = '<option value="" disabled selected>Select a function</option>';
+
+            functionNames.forEach(functionName => {
+                const option = document.createElement('option');
+                option.value = functionName;
+                option.textContent = functionName;
+                functionSelect.appendChild(option);
+            });
+        }
+        function executeProcedure() {
+            var selectedProcedure = document.getElementById('procedureSelect').value;
+            var inputValue = document.getElementById('procedureInput').value;
+
+            console.log('Sending data:', {
+                action: 'executeProcedure',
+                procedureName: selectedProcedure,
+                inputValue: inputValue,
+            });
+
+            fetch('http://localhost:8080', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'executeProcedure',
+                    procedureName: selectedProcedure,
+                    inputValue: inputValue,
+                }),
+            })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    } else {
+                        throw new Error('Network response was not ok');
+                    }
+                })
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error:', data.error);
+                        document.getElementById('resultContainer').innerText = `Error: ${data.error}`;
+                    } else {
+                        displayResultTable(data.result);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function executeFunctionWithParams() {
+            var selectedFunction = document.getElementById('functionSelect').value;
+            var inputValues = document.getElementById('functionInput').value;
+
+            console.log('Sending data:', {
+                action: 'executeFunction',
+                functionName: selectedFunction,
+                inputValues: inputValues,
+            });
+
+            fetch('http://localhost:8080', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'executeFunction',
+                    functionName: selectedFunction,
+                    inputValues: inputValues,
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        console.error('Error:', data.error);
+                        document.getElementById('resultContainer').innerText = `Error: ${data.error}`;
+                    } else {
+                        displayResultTable(data.result);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function executeSelect() {
+            var selectStatement = document.getElementById('selectStatement').value;
+
+            console.log('Sending data:', {
+                action: 'executeSelect',
+                selectStatement: selectStatement,
+            });
+
+            fetch('http://localhost:8080', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    action: 'executeSelect',
+                    selectStatement: selectStatement,
+                }),
+            })
+                .then(response => response.json())
+                .then(data => {
+                    displayResultTable(data.result);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+        }
+
+        function displayResultTable(resultData) {
+            if (!resultData.result || resultData.result.length === 0) {
+                document.getElementById('resultContainer').innerHTML = 'No data available.';
+                return;
+            }
+
+            const columnNames = resultData.result[0];
+            const rows = resultData.result.slice(1);
+
+            const tableHtml = `
+                                                                <table border="1">
+                                                                    <thead>
+                                                                        <tr>${columnNames.map(name => `<th>${name}</th>`).join('')}</tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        ${rows.map(row => `<tr>${row.map(cell => `<td>${cell}</td>`).join('')}</tr>`).join('')}
+                                                                    </tbody>
+                                                                </table>
+                                                            `;
+
+            document.getElementById('resultContainer').innerHTML = tableHtml;
+        }
+    </script>
+</body>
+</html>
